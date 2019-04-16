@@ -2,4 +2,4 @@ FROM opensuse/leap:15.0
 RUN zypper -n in system-user-nobody ruby
 RUN gem install bosh-template
 USER nobody
-COPY binaries/cf-operator /usr/local/bin/cf-operator
+COPY binaries/cf-operator_linux_amd64 /usr/local/bin/cf-operator

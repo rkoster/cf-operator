@@ -1,0 +1,11 @@
+#!/bin/bash
+
+set -euo pipefail
+
+GIT_ROOT=${GIT_ROOT:-$(git rev-parse --show-toplevel)}
+. "${GIT_ROOT}/bin/include/versioning"
+
+BASEDIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+echo "Build binary for image"
+CGO_ENABLED=0 gox -osarch "linux/amd64" -output "${BASEDIR}/binaries/cf-operator_linux_amd64" -mod="vendor" -ldflags="-X code.cloudfoundry.org/cf-operator/version.Version=${ARTIFACT_VERSION}" ./cmd/cf-operator/

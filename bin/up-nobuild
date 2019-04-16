@@ -8,8 +8,8 @@ set -e
 export DOCKER_IMAGE_TAG=${VERSION_TAG}
 
 if [ -z "$SKIP_IMAGE" ]; then
-  if [ "$(uname -s)" = "Darwin" ]; then
-    bin/build-linux-amd64
+  if [ ! -f "binaries/cf-operator_linux_amd64" ]; then
+    bin/build-cross-compilation
   fi
   bin/build-nobuild-image
 fi
