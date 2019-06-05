@@ -2,6 +2,7 @@ package boshdeployment
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
@@ -15,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	bdm "code.cloudfoundry.org/cf-operator/pkg/bosh/manifest"
+	"code.cloudfoundry.org/cf-operator/pkg/kube/apis"
 	bdv1 "code.cloudfoundry.org/cf-operator/pkg/kube/apis/boshdeployment/v1alpha1"
 	"code.cloudfoundry.org/cf-operator/pkg/kube/util/config"
 	"code.cloudfoundry.org/cf-operator/pkg/kube/util/ctxlog"
@@ -43,132 +45,114 @@ func AddDeployment(ctx context.Context, config *config.Config, mgr manager.Manag
 		return err
 	}
 
-	// Watch ConfigMaps referenced by the BOSHDeployment
-	configMapPredicates := predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			configMap := e.Object.(*corev1.ConfigMap)
-
-			reconciles, err := reference.GetReconciles(ctx, mgr.GetClient(), reference.ReconcileForBOSHDeployment, configMap)
-			if err != nil {
-				ctxlog.Errorf(ctx, "Failed to calculate reconciles for configMap '%s': %v", configMap.Name, err)
-			}
-
-			shouldProcessEvent := len(reconciles) > 0
-			if shouldProcessEvent {
-				for _, reconcile := range reconciles {
-					ctxlog.WithEvent(configMap, "Predicates").Debugf(ctx,
-						"Configmap %s creation allowed. Found reconciliation for BOSHDeployment in namespace %s.",
-						configMap.Name,
-						reconcile.Namespace)
-				}
-			}
-
-			// The ConfigMap should reference at least one BOSHDeployment in order for us to consider it
-			return shouldProcessEvent
-		},
-		DeleteFunc:  func(e event.DeleteEvent) bool { return false },
-		GenericFunc: func(e event.GenericEvent) bool { return false },
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			oldConfigMap := e.ObjectOld.(*corev1.ConfigMap)
-			newConfigMap := e.ObjectNew.(*corev1.ConfigMap)
-
-			reconciles, err := reference.GetReconciles(ctx, mgr.GetClient(), reference.ReconcileForBOSHDeployment, newConfigMap)
-			if err != nil {
-				ctxlog.Errorf(ctx, "Failed to calculate reconciles for configMap '%s': %v", newConfigMap.Name, err)
-			}
-
-			shouldProcessEvent := len(reconciles) > 0 && !reflect.DeepEqual(oldConfigMap.Data, newConfigMap.Data)
-			if shouldProcessEvent {
-				for _, reconcile := range reconciles {
-					ctxlog.WithEvent(newConfigMap, "Predicates").Debugf(ctx,
-						"Configmap %s update allowed. Found reconciliation for BOSHDeployment in namespace %s.",
-						newConfigMap.Name,
-						reconcile.Namespace)
-				}
-			}
-
-			// The ConfigMap should reference at least one BOSHDeployment in order for us to consider it
-			return shouldProcessEvent
-		},
-	}
 	err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestsFromMapFunc{
 		ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
-			config := a.Object.(*corev1.ConfigMap)
-
-			reconciles, err := reference.GetReconciles(ctx, mgr.GetClient(), reference.ReconcileForBOSHDeployment, config)
-			if err != nil {
-				ctxlog.Errorf(ctx, "Failed to calculate reconciles for config '%s': %v", config.Name, err)
-			}
-
-			return reconciles
+			return enqueueReconcilesForBoshDeployment(ctx, mgr, a)
 		}),
-	}, configMapPredicates)
+	}, GetPredicates(ctx, mgr, &corev1.ConfigMap{}))
 	if err != nil {
 		return err
 	}
 
-	// Watch Secrets referenced by the BOSHDeployment
-	secretPredicates := predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			secret := e.Object.(*corev1.Secret)
-			reconciles, err := reference.GetReconciles(ctx, mgr.GetClient(), reference.ReconcileForBOSHDeployment, secret)
-			if err != nil {
-				ctxlog.Errorf(ctx, "Failed to calculate reconciles for secret '%s': %v", secret.Name, err)
-			}
-
-			shouldProcessEvent := len(reconciles) > 1
-			if shouldProcessEvent {
-				for _, reconcile := range reconciles {
-					ctxlog.WithEvent(secret, "Predicates").Debugf(ctx,
-						"Secret %s creation allowed. Found reconciliation for BOSHDeployment in namespace %s.",
-						secret.Name,
-						reconcile.Namespace)
-				}
-
-			}
-
-			// The Secret should reference at least one BOSHDeployment in order for us to consider it
-			return shouldProcessEvent
-		},
-		DeleteFunc:  func(e event.DeleteEvent) bool { return false },
-		GenericFunc: func(e event.GenericEvent) bool { return false },
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			oldSecret := e.ObjectOld.(*corev1.Secret)
-			newSecret := e.ObjectNew.(*corev1.Secret)
-
-			reconciles, err := reference.GetReconciles(ctx, mgr.GetClient(), reference.ReconcileForBOSHDeployment, newSecret)
-			if err != nil {
-				ctxlog.Errorf(ctx, "Failed to calculate reconciles for secret '%s': %v", newSecret.Name, err)
-			}
-
-			shouldProcessEvent := len(reconciles) > 1 && !reflect.DeepEqual(oldSecret.Data, newSecret.Data)
-			if shouldProcessEvent {
-				for _, reconcile := range reconciles {
-					ctxlog.WithEvent(newSecret, "Predicates").Debugf(ctx,
-						"Secret %s update allowed. Found reconciliation for BOSHDeployment in namespace %s.",
-						newSecret.Name,
-						reconcile.Namespace)
-				}
-			}
-
-			return shouldProcessEvent
-		},
-	}
 	err = c.Watch(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestsFromMapFunc{
 		ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
-			secret := a.Object.(*corev1.Secret)
+			return enqueueReconcilesForBoshDeployment(ctx, mgr, a)
 
-			reconciles, err := reference.GetReconciles(ctx, mgr.GetClient(), reference.ReconcileForBOSHDeployment, secret)
-			if err != nil {
-				ctxlog.Errorf(ctx, "Failed to calculate reconciles for secret '%s': %v", secret.Name, err)
-			}
-
-			return reconciles
 		}),
-	}, secretPredicates)
+	}, GetPredicates(ctx, mgr, &corev1.Secret{}))
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func enqueueReconcilesForBoshDeployment(ctx context.Context, mgr manager.Manager, a handler.MapObject) []reconcile.Request {
+	var (
+		listReconciles []reconcile.Request
+		err            error
+	)
+
+	logReconcilePredicates := func(reconciles []reconcile.Request) {
+		for _, reconciliation := range reconciles {
+			ctxlog.WithEvent(a.Object, "Mapping").DebugJSON(ctx,
+				"Enqueuing reconcile requests in response to events",
+				ctxlog.ReconcileEventsFromSource{
+					ReconciliationObjectName: reconciliation.Name,
+					ReconciliationObjectKind: string(reference.ReconcileForBOSHDeployment),
+					PredicateObjectName:      a.Meta.GetName(),
+					PredicateObjectKind:      a.Object.GetObjectKind().GroupVersionKind().GroupKind().Kind,
+					Namespace:                reconciliation.Namespace,
+					Type:                     "mapping",
+					Message:                  fmt.Sprintf("fan-out updates from %s into %s", a.Meta.GetName(), reconciliation.Name),
+				})
+		}
+	}
+
+	switch a.Object.(type) {
+	case *corev1.ConfigMap:
+		listReconciles, err = reference.GetReconciles(ctx, mgr.GetClient(), reference.ReconcileForBOSHDeployment, a.Object.(*corev1.ConfigMap))
+		if err != nil {
+			ctxlog.Errorf(ctx, "Failed to calculate reconciles for configmap '%s': %v", a.Object.(*corev1.ConfigMap).Name, err)
+		}
+		logReconcilePredicates(listReconciles)
+	case *corev1.Secret:
+		listReconciles, err = reference.GetReconciles(ctx, mgr.GetClient(), reference.ReconcileForBOSHDeployment, a.Object.(*corev1.Secret))
+		if err != nil {
+			ctxlog.Errorf(ctx, "Failed to calculate reconciles for secret '%s': %v", a.Object.(*corev1.Secret).Name, err)
+		}
+		logReconcilePredicates(listReconciles)
+	}
+	return listReconciles
+}
+
+// GetPredicates ...
+func GetPredicates(ctx context.Context, mgr manager.Manager, customObject apis.Object) predicate.Funcs {
+
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			switch customObject.(type) {
+			case *corev1.ConfigMap:
+				c := e.Object.(*corev1.ConfigMap)
+				reconciles, err := reference.GetReconciles(ctx, mgr.GetClient(), reference.ReconcileForBOSHDeployment, c)
+				if err != nil {
+					ctxlog.Errorf(ctx, "Failed to calculate reconciles for configMap '%s': %v", c.Name, err)
+				}
+				return len(reconciles) > 0
+			case *corev1.Secret:
+				s := e.Object.(*corev1.Secret)
+				reconciles, err := reference.GetReconciles(ctx, mgr.GetClient(), reference.ReconcileForBOSHDeployment, s)
+				if err != nil {
+					ctxlog.Errorf(ctx, "Failed to calculate reconciles for secret '%s': %v", s.Name, err)
+				}
+				return len(reconciles) > 1
+			default:
+				return false
+			}
+		},
+		DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+		GenericFunc: func(e event.GenericEvent) bool { return false },
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			switch customObject.(type) {
+			case *corev1.ConfigMap:
+				cO := e.ObjectOld.(*corev1.ConfigMap)
+				cN := e.ObjectNew.(*corev1.ConfigMap)
+				reconciles, err := reference.GetReconciles(ctx, mgr.GetClient(), reference.ReconcileForBOSHDeployment, cN)
+				if err != nil {
+					ctxlog.Errorf(ctx, "Failed to calculate reconciles for configMap '%s': %v", cN.Name, err)
+				}
+				return len(reconciles) > 0 && !reflect.DeepEqual(cO.Data, cN.Data)
+			case *corev1.Secret:
+				sO := e.ObjectOld.(*corev1.Secret)
+				sN := e.ObjectNew.(*corev1.Secret)
+				reconciles, err := reference.GetReconciles(ctx, mgr.GetClient(), reference.ReconcileForBOSHDeployment, sN)
+				if err != nil {
+					ctxlog.Errorf(ctx, "Failed to calculate reconciles for secret '%s': %v", sN.Name, err)
+				}
+				return len(reconciles) > 1 && !reflect.DeepEqual(sO.Data, sN.Data)
+			default:
+				return false
+			}
+		},
+	}
 }
