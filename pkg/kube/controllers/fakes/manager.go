@@ -11,7 +11,6 @@ import (
 	cache "sigs.k8s.io/controller-runtime/pkg/cache"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 	manager "sigs.k8s.io/controller-runtime/pkg/manager"
-	types "sigs.k8s.io/controller-runtime/pkg/webhook/admission/types"
 )
 
 type FakeManager struct {
