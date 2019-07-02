@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -82,24 +81,15 @@ func AddHooks(ctx context.Context, config *config.Config, m manager.Manager, gen
 
 	webhookConfig := NewWebhookConfig(m.GetClient(), config, generator, WebhookConfigPrefix+config.Namespace)
 
-	disableConfigInstaller := true
-	hookServer, err := webhook.NewServer("cf-operator", m, webhook.ServerOptions{
-		Port:                          config.WebhookServerPort,
-		CertDir:                       webhookConfig.CertDir,
-		DisableWebhookConfigInstaller: &disableConfigInstaller,
-		BootstrapOptions: &webhook.BootstrapOptions{
-			MutatingWebhookConfigName: webhookConfig.ConfigName,
-			Host:                      &config.WebhookServerHost,
-			// The user should probably be able to use a service instead.
-			// Service: ??
-		},
-	})
+	hookServer := &webhook.Server{
+		Port:    int(config.WebhookServerPort),
+		CertDir: webhookConfig.CertDir,
+	}
 
+	err := m.Add(hookServer)
 	if err != nil {
 		return errors.Wrap(err, "unable to create a new webhook server")
 	}
-
-	hookServer.Handle(HTTPReadyzEndpoint, ordinaryHTTPHandler())
 
 	log := ctxlog.ExtractLogger(ctx)
 	webhooks := []*admission.Webhook{}
@@ -125,12 +115,6 @@ func AddHooks(ctx context.Context, config *config.Config, m manager.Manager, gen
 		return errors.Wrap(err, "generating the webhook server configuration")
 	}
 	return err
-}
-
-func ordinaryHTTPHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
 }
 
 func setOperatorNamespaceLabel(ctx context.Context, config *config.Config, c client.Client) error {

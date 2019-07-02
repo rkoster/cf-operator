@@ -2,6 +2,7 @@ package extendedstatefulset
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -13,11 +14,9 @@ import (
 	"k8s.io/api/apps/v1beta2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-
 	mTypes "k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	essv1a1 "code.cloudfoundry.org/cf-operator/pkg/kube/apis/extendedstatefulset/v1alpha1"
@@ -32,7 +31,7 @@ type PodMutator struct {
 	setReference setReferenceFunc
 	log          *zap.SugaredLogger
 	config       *config.Config
-	decoder      types.Decoder
+	decoder      *admission.Decoder
 }
 
 // Implement admission.Handler so the controller can handle admission request.
@@ -53,7 +52,7 @@ func NewPodMutator(log *zap.SugaredLogger, config *config.Config, mgr manager.Ma
 }
 
 // Handle manages volume claims for ExtendedStatefulSet pods
-func (m *PodMutator) Handle(ctx context.Context, req types.Request) types.Response {
+func (m *PodMutator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	pod := &corev1.Pod{}
 
 	err := m.decoder.Decode(req, pod)
@@ -61,7 +60,7 @@ func (m *PodMutator) Handle(ctx context.Context, req types.Request) types.Respon
 	m.log.Debug("Pod mutator handler ran for pod ", pod.Name)
 
 	if err != nil {
-		return admission.ErrorResponse(http.StatusBadRequest, err)
+		return admission.Errored(http.StatusBadRequest, err)
 	}
 
 	updatedPod := pod.DeepCopy()
@@ -71,11 +70,16 @@ func (m *PodMutator) Handle(ctx context.Context, req types.Request) types.Respon
 	if isStatefulSetPod(pod.GetLabels()) {
 		err = m.mutatePodsFn(ctx, updatedPod)
 		if err != nil {
-			return admission.ErrorResponse(http.StatusInternalServerError, err)
+			return admission.Errored(http.StatusInternalServerError, err)
 		}
 	}
 
-	return admission.PatchResponse(pod, updatedPod)
+	marshaledPod, err := json.Marshal(updatedPod)
+	if err != nil {
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+
+	return admission.PatchResponseFromRaw(req.Object.Raw, marshaledPod)
 }
 
 // mutatePodsFn add an annotation to the given pod
@@ -128,7 +132,7 @@ func (m *PodMutator) addPersistentVolumeClaims(ctx context.Context, statefulSet 
 	// Get persistentVolumeClaims list
 	opts := client.InNamespace(m.config.Namespace)
 	persistentVolumeClaimList := &corev1.PersistentVolumeClaimList{}
-	err := m.client.List(ctx, opts, persistentVolumeClaimList)
+	err := m.client.List(ctx, persistentVolumeClaimList, opts)
 	if err != nil {
 		return errors.Wrapf(err, "Couldn't fetch PVC's")
 	}
@@ -235,7 +239,6 @@ func isStatefulSetPod(labels map[string]string) bool {
 
 // podAnnotator implements inject.Client.
 // A client will be automatically injected.
-var _ inject.Client = &PodMutator{}
 
 // InjectClient injects the client.
 func (m *PodMutator) InjectClient(c client.Client) error {
@@ -245,10 +248,9 @@ func (m *PodMutator) InjectClient(c client.Client) error {
 
 // podAnnotator implements inject.Decoder.
 // A decoder will be automatically injected.
-var _ inject.Decoder = &PodMutator{}
 
 // InjectDecoder injects the decoder.
-func (m *PodMutator) InjectDecoder(d types.Decoder) error {
+func (m *PodMutator) InjectDecoder(d *admission.Decoder) error {
 	m.decoder = d
 	return nil
 }

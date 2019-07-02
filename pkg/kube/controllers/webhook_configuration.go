@@ -4,10 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"net"
-	"net/url"
 	"path"
-	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -166,26 +163,26 @@ func (f *WebhookConfig) generateWebhookServerConfig(ctx context.Context, webhook
 		},
 	}
 
-	for _, webhook := range webhooks {
-		url := url.URL{
-			Scheme: "https",
-			Host:   net.JoinHostPort(f.config.WebhookServerHost, strconv.Itoa(int(f.config.WebhookServerPort))),
-			Path:   webhook.Path,
-		}
-		urlString := url.String()
-		wh := admissionregistrationv1beta1.Webhook{
-			Name:              webhook.GetName(),
-			Rules:             webhook.Rules,
-			FailurePolicy:     webhook.FailurePolicy,
-			NamespaceSelector: webhook.NamespaceSelector,
-			ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
-				CABundle: f.CaCertificate,
-				URL:      &urlString,
-			},
-		}
+	// for _, webhook := range webhooks {
+	//         url := url.URL{
+	//                 Scheme: "https",
+	//                 Host:   net.JoinHostPort(f.config.WebhookServerHost, strconv.Itoa(int(f.config.WebhookServerPort))),
+	//                 Path:   webhook.Path,
+	//         }
+	//         urlString := url.String()
+	//         wh := admissionregistrationv1beta1.Webhook{
+	//                 Name:              webhook.GetName(),
+	//                 Rules:             webhook.Rules,
+	//                 FailurePolicy:     webhook.FailurePolicy,
+	//                 NamespaceSelector: webhook.NamespaceSelector,
+	//                 ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
+	//                         CABundle: f.CaCertificate,
+	//                         URL:      &urlString,
+	//                 },
+	//         }
 
-		config.Webhooks = append(config.Webhooks, wh)
-	}
+	//         config.Webhooks = append(config.Webhooks, wh)
+	// }
 
 	f.client.Delete(ctx, config)
 	err := f.client.Create(ctx, config)
