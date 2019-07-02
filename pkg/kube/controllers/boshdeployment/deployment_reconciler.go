@@ -193,15 +193,12 @@ func (r *ReconcileBOSHDeployment) createManifestWithOps(ctx context.Context, ins
 	}
 
 	// Apply the secret
-	_, err = controllerutil.CreateOrUpdate(ctx, r.client, manifestSecret, func(obj runtime.Object) error {
-		if s, ok := obj.(*corev1.Secret); ok {
-			s.Data = map[string][]byte{}
-			s.StringData = map[string]string{
-				"manifest.yaml": string(manifestBytes),
-			}
-			return nil
+	_, err = controllerutil.CreateOrUpdate(ctx, r.client, manifestSecret, func() error {
+		manifestSecret.Data = map[string][]byte{}
+		manifestSecret.StringData = map[string]string{
+			"manifest.yaml": string(manifestBytes),
 		}
-		return fmt.Errorf("object is not a Secret")
+		return nil
 	})
 	if err != nil {
 		return nil, log.WithEvent(instance, "ManifestWithOpsApplyError").Errorf(ctx, "Failed to apply Secret '%s': %v", manifestSecretName, err)
@@ -216,13 +213,11 @@ func (r *ReconcileBOSHDeployment) createEJob(ctx context.Context, instance *bdv1
 		return fmt.Errorf("failed to set ownerReference for ExtendedJob '%s': %v", eJob.GetName(), err)
 	}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, r.client, eJob.DeepCopy(), func(obj runtime.Object) error {
-		if existingEJob, ok := obj.(*ejv1.ExtendedJob); ok {
-			eJob.ObjectMeta.ResourceVersion = existingEJob.ObjectMeta.ResourceVersion
-			eJob.DeepCopyInto(existingEJob)
-			return nil
-		}
-		return fmt.Errorf("object is not an ExtendedJob")
+	existingEJob := eJob.DeepCopy()
+	_, err := controllerutil.CreateOrUpdate(ctx, r.client, existingEJob, func() error {
+		eJob.ObjectMeta.ResourceVersion = existingEJob.ObjectMeta.ResourceVersion
+		eJob.DeepCopyInto(existingEJob)
+		return nil
 	})
 	return err
 }

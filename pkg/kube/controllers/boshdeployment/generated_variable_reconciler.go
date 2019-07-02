@@ -2,7 +2,6 @@ package boshdeployment
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pkg/errors"
 	yaml "gopkg.in/yaml.v2"
@@ -114,12 +113,9 @@ func (r *ReconcileGeneratedVariable) generateVariableSecrets(ctx context.Context
 			return err
 		}
 
-		_, err = controllerutil.CreateOrUpdate(ctx, r.client, variable.DeepCopy(), func(obj runtime.Object) error {
-			s, ok := obj.(*esv1.ExtendedSecret)
-			if !ok {
-				return fmt.Errorf("object is not an ExtendedSecret")
-			}
-			s.Spec = variable.Spec
+		existingVariable := variable.DeepCopy()
+		_, err = controllerutil.CreateOrUpdate(ctx, r.client, existingVariable, func() error {
+			existingVariable.Spec = variable.Spec
 			return nil
 		})
 		if err != nil {

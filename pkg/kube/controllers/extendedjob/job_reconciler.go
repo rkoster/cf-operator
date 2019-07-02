@@ -3,7 +3,6 @@ package extendedjob
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"reflect"
 
 	"github.com/pkg/errors"
@@ -12,7 +11,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -214,14 +212,9 @@ func (r *ReconcileJob) persistOutput(ctx context.Context, instance *batchv1.Job,
 				return errors.Wrap(err, "could not create secret")
 			}
 		} else {
-			_, err = controllerutil.CreateOrUpdate(ctx, r.client, secret, func(obj runtime.Object) error {
-				s, ok := obj.(*corev1.Secret)
-				if !ok {
-					return fmt.Errorf("object is not a Secret")
-				}
-
-				s.SetLabels(secretLabels)
-				s.StringData = data
+			_, err = controllerutil.CreateOrUpdate(ctx, r.client, secret, func() error {
+				secret.SetLabels(secretLabels)
+				secret.StringData = data
 				return nil
 			})
 			if err != nil {
