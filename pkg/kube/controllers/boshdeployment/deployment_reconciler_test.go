@@ -53,7 +53,7 @@ var _ = Describe("ReconcileBoshDeployment", func() {
 		recorder = record.NewFakeRecorder(20)
 		manager = &cfakes.FakeManager{}
 		manager.GetSchemeReturns(scheme.Scheme)
-		manager.GetRecorderReturns(recorder)
+		manager.GetEventRecorderForReturns(recorder)
 		resolver = fakes.FakeResolver{}
 
 		request = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}

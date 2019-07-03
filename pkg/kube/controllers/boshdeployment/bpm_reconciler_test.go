@@ -55,7 +55,7 @@ var _ = Describe("ReconcileBPM", func() {
 		recorder = record.NewFakeRecorder(20)
 		manager = &cfakes.FakeManager{}
 		manager.GetSchemeReturns(scheme.Scheme)
-		manager.GetRecorderReturns(recorder)
+		manager.GetEventRecorderForReturns(recorder)
 		resolver = fakes.FakeDesiredManifest{}
 		size := 1024
 

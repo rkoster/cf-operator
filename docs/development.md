@@ -251,7 +251,7 @@ This is how it's set up for reconcilers:
 // after logger is available
 ctx := ctxlog.NewParentContext(log)
 // adding named log and event recorder in controllers
-ctx = ctxlog.NewContextWithRecorder(ctx, "example-reconciler", mgr.GetRecorder("example-recorder"))
+ctx = ctxlog.NewContextWithRecorder(ctx, "example-reconciler", mgr.GetEventRecorderFor("example-recorder"))
 // adding timeout in reconcilers
 ctx, cancel := context.WithTimeout(ctx, timeout)
 defer cancle()

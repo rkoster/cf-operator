@@ -48,7 +48,7 @@ var _ = Describe("ReconcileGeneratedVariable", func() {
 		recorder = record.NewFakeRecorder(20)
 		manager = &cfakes.FakeManager{}
 		manager.GetSchemeReturns(scheme.Scheme)
-		manager.GetRecorderReturns(recorder)
+		manager.GetEventRecorderForReturns(recorder)
 
 		request = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo-with-ops", Namespace: "default"}}
 
