@@ -250,14 +250,14 @@ func (r Owner) ListConfigsOwnedBy(ctx context.Context, owner apis.Object) ([]api
 
 	// List all ConfigMaps in the owner's namespace
 	configMaps := &corev1.ConfigMapList{}
-	err := r.client.List(ctx, opts, configMaps)
+	err := r.client.List(ctx, configMaps, opts)
 	if err != nil {
 		return []apis.Object{}, fmt.Errorf("error listing ConfigMaps: %v", err)
 	}
 
 	// List all Secrets in the owner's namespace
 	secrets := &corev1.SecretList{}
-	err = r.client.List(ctx, opts, secrets)
+	err = r.client.List(ctx, secrets, opts)
 	if err != nil {
 		return []apis.Object{}, fmt.Errorf("error listing Secrets: %v", err)
 	}

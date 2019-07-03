@@ -143,19 +143,13 @@ func (r *ReconcileJob) Reconcile(request reconcile.Request) (reconcile.Result, e
 
 // jobPod gets the job's pod. Only single-pod jobs are supported when persisting the output, so we just get the first one.
 func (r *ReconcileJob) jobPod(ctx context.Context, name string, namespace string) (*corev1.Pod, error) {
-	selector, err := labels.Parse("job-name=" + name)
-	if err != nil {
-		return nil, err
-	}
-
 	list := &corev1.PodList{}
-	err = r.client.List(
+	err := r.client.List(
 		ctx,
-		&client.ListOptions{
-			Namespace:     namespace,
-			LabelSelector: selector,
-		},
-		list)
+		list,
+		client.InNamespace(namespace),
+		client.MatchingLabels(map[string]string{"job-name": name}),
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "listing job's pods")
 	}

@@ -9,7 +9,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -165,13 +164,7 @@ func (r *ReconcileStatefulSetCleanup) listStatefulSets(ctx context.Context, exSt
 	result := []v1beta2.StatefulSet{}
 
 	allStatefulSets := &v1beta2.StatefulSetList{}
-	err := r.client.List(
-		ctx,
-		&client.ListOptions{
-			Namespace:     exStatefulSet.Namespace,
-			LabelSelector: labels.Everything(),
-		},
-		allStatefulSets)
+	err := r.client.List(ctx, allStatefulSets, client.InNamespace(exStatefulSet.Namespace))
 	if err != nil {
 		return nil, err
 	}
@@ -188,18 +181,14 @@ func (r *ReconcileStatefulSetCleanup) listStatefulSets(ctx context.Context, exSt
 
 // isStatefulSetReady returns true if at least one pod owned by the StatefulSet is running
 func (r *ReconcileStatefulSetCleanup) isStatefulSetReady(ctx context.Context, statefulSet *v1beta2.StatefulSet) (bool, error) {
-	labelsSelector := labels.Set{
-		v1beta2.StatefulSetRevisionLabel: statefulSet.Status.CurrentRevision,
-	}
-
 	podList := &corev1.PodList{}
 	err := r.client.List(
 		ctx,
-		&client.ListOptions{
-			Namespace:     statefulSet.Namespace,
-			LabelSelector: labelsSelector.AsSelector(),
-		},
 		podList,
+		client.InNamespace(statefulSet.Namespace),
+		client.MatchingLabels(map[string]string{
+			v1beta2.StatefulSetRevisionLabel: statefulSet.Status.CurrentRevision,
+		}),
 	)
 	if err != nil {
 		return false, err

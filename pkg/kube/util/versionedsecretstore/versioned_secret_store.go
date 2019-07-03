@@ -259,15 +259,10 @@ func (p VersionedSecretStoreImpl) Delete(ctx context.Context, namespace string, 
 }
 
 func (p VersionedSecretStoreImpl) listSecrets(ctx context.Context, namespace string, secretName string) ([]corev1.Secret, error) {
-	secretLabelsSet := labels.Set{
-		LabelSecretKind: VersionSecretKind,
-	}
+	secretLabelsSet := labels.Set{LabelSecretKind: VersionSecretKind}
 
 	secrets := &corev1.SecretList{}
-	if err := p.client.List(ctx, &client.ListOptions{
-		Namespace:     namespace,
-		LabelSelector: secretLabelsSet.AsSelector(),
-	}, secrets); err != nil {
+	if err := p.client.List(ctx, secrets, client.InNamespace(namespace), client.MatchingLabels(secretLabelsSet)); err != nil {
 		return nil, err
 	}
 

@@ -11,7 +11,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -214,13 +213,7 @@ func (r *ReconcileExtendedStatefulSet) listStatefulSets(ctx context.Context, exS
 	// Get owned resources
 	// Go through each StatefulSet
 	allStatefulSets := &v1beta2.StatefulSetList{}
-	err := r.client.List(
-		ctx,
-		&client.ListOptions{
-			Namespace:     exStatefulSet.Namespace,
-			LabelSelector: labels.Everything(),
-		},
-		allStatefulSets)
+	err := r.client.List(ctx, allStatefulSets, client.InNamespace(exStatefulSet.Namespace))
 	if err != nil {
 		return nil, err
 	}
