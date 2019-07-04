@@ -18,10 +18,12 @@ type Limits struct {
 
 // Volume from a BPM config
 type Volume struct {
-	Path            string `yaml:"path,omitempty"`
-	Writable        bool   `yaml:"writable,omitempty"`
-	AllowExecutions bool   `yaml:"allow_executions,omitempty"`
-	MountOnly       bool   `yaml:"mount_only,omitempty"`
+	Path     string `yaml:"path,omitempty"`
+	Writable bool   `yaml:"writable,omitempty"`
+	// AllowExecutions only works for persistent volumes and only for certain volume types
+	AllowExecutions bool `yaml:"allow_executions,omitempty"`
+	// MountOnly is ignored for now
+	MountOnly bool `yaml:"mount_only,omitempty"`
 }
 
 // Unsafe from a BPM config
