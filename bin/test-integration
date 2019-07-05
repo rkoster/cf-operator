@@ -43,10 +43,4 @@ fi
 
 NODES=${NODES:-3}
 FLAKE_ATTEMPTS=${FLAKE_ATTEMPTS:-3}
-ginkgo \
-  --randomizeAllSpecs \
-  --nodes="$NODES" \
-  --slowSpecThreshold=50 \
-  --flakeAttempts="$FLAKE_ATTEMPTS" \
-  $COV_ARG \
-  integration/
+ginkgo -focus "when BPM has pre-start hooks configured" integration/
