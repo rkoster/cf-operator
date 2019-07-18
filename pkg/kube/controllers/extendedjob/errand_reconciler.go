@@ -16,6 +16,7 @@ import (
 	"code.cloudfoundry.org/cf-operator/pkg/kube/util/config"
 	"code.cloudfoundry.org/cf-operator/pkg/kube/util/ctxlog"
 	"code.cloudfoundry.org/cf-operator/pkg/kube/util/names"
+	"code.cloudfoundry.org/cf-operator/pkg/kube/util/reference"
 	vss "code.cloudfoundry.org/cf-operator/pkg/kube/util/versionedsecretstore"
 )
 
@@ -108,6 +109,9 @@ func (r *ErrandReconciler) Reconcile(request reconcile.Request) (reconcile.Resul
 	return result, err
 }
 
+// TODO Split createJob into two parts:
+// - check all of references are ready
+// - create job to start
 func (r *ErrandReconciler) createJob(ctx context.Context, eJob ejv1.ExtendedJob) error {
 	template := eJob.Spec.Template.DeepCopy()
 
@@ -116,7 +120,28 @@ func (r *ErrandReconciler) createJob(ctx context.Context, eJob ejv1.ExtendedJob)
 	}
 	template.Labels[ejv1.LabelEJobName] = eJob.Name
 
-	r.versionedSecretStore.SetSecretReferences(ctx, eJob.Namespace, &template.Spec)
+	err := r.versionedSecretStore.SetSecretReferences(ctx, eJob.Namespace, &template.Spec)
+	if err != nil {
+		return err
+	}
+
+	configMaps, err := reference.GetConfigMapsReferencedBy(eJob)
+	if err != nil {
+		return err
+	}
+
+	for _, configMap := range configMaps {
+	}
+
+	secrets, err := reference.GetSecretsReferencedBy(eJob)
+	if err != nil {
+		return err
+	}
+
+	for _, secret := range secrets {
+	}
+
+
 
 	name, err := names.JobName(eJob.Name, "")
 	if err != nil {
@@ -133,8 +158,7 @@ func (r *ErrandReconciler) createJob(ctx context.Context, eJob ejv1.ExtendedJob)
 
 	err = r.setOwnerReference(&eJob, job, r.scheme)
 	if err != nil {
-		ctxlog.WithEvent(&eJob, "SetOwnerReferenceError").Errorf(ctx, "failed to set owner reference on job for '%s': %s", eJob.Name, err)
-		return err
+		return ctxlog.WithEvent(&eJob, "SetOwnerReferenceError").Errorf(ctx, "failed to set owner reference on job for '%s': %s", eJob.Name, err)
 	}
 
 	err = r.client.Create(ctx, job)
